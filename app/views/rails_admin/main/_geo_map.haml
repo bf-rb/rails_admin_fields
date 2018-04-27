@@ -1,0 +1,69 @@
+- map_id = "#{field.method_name}_map_position_input"
+
+= form.hidden_field field.method_name, { id: map_id }
+
+- map_url = 'https://maps.googleapis.com/maps/api/js?callback=initMap&key='
+- map_url += ENV['GOOGLE_MAP_API_KEY']
+
+%script{ async: '', defer: 'defer', src: map_url }
+
+#map{style: 'height: 300px;'}
+
+:javascript
+
+  window.ActiveAdminMapPosition = function() {
+    this.longitude = 0;
+    this.latitude = 0;
+
+    this.setLonLat = function(lon, lat) {
+      this.longitude = lon;
+      this.latitude = lat;
+    };
+
+    this.inputValue = function(input_id) {
+      document.getElementById(input_id).value = "POINT("+ this.latitude + " " + this.longitude +")"
+    }
+
+  };
+
+  function initMap() {
+    var myLatlng, newObj = #{!@object.persisted?};
+    var geoPoint = new ActiveAdminMapPosition();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function (position) {
+
+        console.log(newObj);
+        if (newObj) {
+          myLatlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+          geoPoint.setLonLat(position.coords.latitude, position.coords.longitude);
+        } else {
+          myLatlng = new google.maps.LatLng(#{@object.send(field.method_name)&.y || 0}, #{@object.send(field.method_name)&.x || 0});
+          geoPoint.setLonLat(#{@object.try(field.method_name)&.y || 0}, #{@object.try(field.method_name)&.x || 0});
+        }
+
+
+        geoPoint.inputValue("#{map_id}");
+
+
+        var map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 15,
+          center: myLatlng
+        });
+
+        // Place a draggable marker on the map
+        var marker = new google.maps.Marker({
+            position: myLatlng,
+            map: map,
+            draggable:true,
+            title:"Drag me!"
+        });
+
+        //get marker position and store in hidden input
+        google.maps.event.addListener(marker, 'dragend', function (evt) {;
+          geoPoint.setLonLat(evt.latLng.lat(), evt.latLng.lng());
+          geoPoint.inputValue("#{map_id}");
+        });
+      });
+    }
+  }
